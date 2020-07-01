@@ -1,0 +1,32 @@
+---
+
+- name: Install nginx
+  yum:
+    name: nginx
+    state: present
+  notify: Nginx restart
+
+- name: Deploy HTTPS certificate
+  copy:
+    content: "{{ https.crt }}"
+    dest: /etc/nginx/proxy.crt
+  notify: Nginx restart
+
+- name: Deploy HTTPS privkey
+  copy:
+    content: "{{ https.key }}"
+    dest: /etc/nginx/proxy.key
+  notify: Nginx restart
+
+- name: Configure vhost
+  template:
+    src: server.conf.j2
+    dest: "/etc/nginx/conf.d/{{ item.id }}.conf"
+  with_items: "{{ proxy }}"
+  notify: Nginx restart
+
+- name: Enable nginx service
+  service:
+    name: nginx
+    enabled: yes
+  notify: Nginx restart

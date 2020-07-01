@@ -1,0 +1,117 @@
+#+TITLE: Nginx https proxy ansible role
+
+** Defaults
+
+#+BEGIN_SRC yaml :tangle ansible/defaults/main.yml
+---
+
+proxy:
+  port: 443
+  server_name: _
+  backend_url: 127.0.0.1:80
+#+END_SRC
+
+** Tasks
+*** main
+
+#+BEGIN_SRC yaml :tangle ansible/tasks/main.yml
+---
+#+END_SRC
+
+**** Install nginx
+
+#+BEGIN_SRC yaml :tangle ansible/tasks/main.yml
+- name: Install nginx
+  yum:
+    name: nginx
+    state: present
+  notify: Nginx restart
+#+END_SRC
+
+**** Deploy HTTPS certificate
+
+#+BEGIN_SRC yaml :tangle ansible/tasks/main.yml
+- name: Deploy HTTPS certificate
+  copy:
+    content: "{{ https.crt }}"
+    dest: /etc/nginx/proxy.crt
+  notify: Nginx restart
+#+END_SRC
+
+**** Deploy HTTPS privkey
+
+#+BEGIN_SRC yaml :tangle ansible/tasks/main.yml
+- name: Deploy HTTPS privkey
+  copy:
+    content: "{{ https.key }}"
+    dest: /etc/nginx/proxy.key
+  notify: Nginx restart
+#+END_SRC
+
+**** Configure vhost
+
+#+BEGIN_SRC yaml :tangle ansible/tasks/main.yml
+- name: Configure vhost
+  template:
+    src: server.conf.j2
+    dest: "/etc/nginx/conf.d/{{ item.id }}.conf"
+  with_items: "{{ proxy }}"
+  notify: Nginx restart
+#+END_SRC
+
+**** Enable nginx service
+
+#+BEGIN_SRC yaml :tangle ansible/tasks/main.yml
+- name: Enable nginx service
+  service:
+    name: nginx
+    enabled: yes
+  notify: Nginx restart
+#+END_SRC
+
+** Templates
+
+#+BEGIN_SRC conf :tangle ansible/templates/server.conf.j2
+server {
+
+    listen {{ item.port }};
+    server_name {{ item.server_name }};
+
+    ssl_certificate           /etc/nginx/proxy.crt;
+    ssl_certificate_key       /etc/nginx/proxy.key;
+
+    ssl on;
+    ssl_session_cache  builtin:1000  shared:SSL:10m;
+    ssl_protocols  TLSv1 TLSv1.1 TLSv1.2;
+    ssl_ciphers HIGH:!aNULL:!eNULL:!EXPORT:!CAMELLIA:!DES:!MD5:!PSK:!RC4;
+    ssl_prefer_server_ciphers on;
+
+    access_log            /var/log/nginx/{{ item.id }}.access.log;
+
+    location {{ item.path }} {
+
+      proxy_set_header        Host $host;
+      proxy_set_header        X-Real-IP $remote_addr;
+      proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header        X-Forwarded-Proto $scheme;
+
+      proxy_pass          {{ item.backend_url }};
+    }
+}
+#+END_SRC
+
+** Handlers
+*** main
+
+#+BEGIN_SRC yaml :tangle ansible/handlers/main.yml
+---
+#+END_SRC
+
+**** Nginx restart
+
+#+BEGIN_SRC yaml :tangle ansible/handlers/main.yml
+- name: Nginx restart
+  service:
+    name: nginx
+    state: restarted
+#+END_SRC

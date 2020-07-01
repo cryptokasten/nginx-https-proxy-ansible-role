@@ -1,0 +1,6 @@
+---
+
+proxy:
+  port: 443
+  server_name: _
+  backend_url: 127.0.0.1:80
